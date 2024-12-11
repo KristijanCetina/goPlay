@@ -19,6 +19,7 @@ run: $(OUTPUT)
 clean:
 	@$(RM) *.out
 	@$(RM) *.o
+	@$(RM) __debug_bin*
 
 %: %.go
 	go build -o $@.out $^
