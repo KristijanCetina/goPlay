@@ -1,4 +1,4 @@
-module kce/fib
+module kcetina/fib
 
 go 1.23.4
 

@@ -9,26 +9,10 @@ import (
 // Mockable ValidateAPIKey function
 var mockValidateAPIKey = validateAPIKey
 
-// Mockable RateLimiter struct
-type MockRateLimiter struct {
-	allowFunc func(string) bool
-}
-
-func (m *MockRateLimiter) Allow(apiKey string) bool {
-	return m.allowFunc(apiKey)
-}
-
 func TestAPIRoute(t *testing.T) {
 	// Mock validateAPIKey function
 	mockValidateAPIKey = func(key string) bool {
 		return key == "valid-key"
-	}
-
-	// Mock rate limiter
-	mockRateLimiter := &MockRateLimiter{
-		allowFunc: func(apiKey string) bool {
-			return apiKey != "rate-limited-key"
-		},
 	}
 
 	tests := []struct {
@@ -67,11 +51,6 @@ func TestAPIRoute(t *testing.T) {
 				key := r.URL.Query().Get("api_key")
 				if !mockValidateAPIKey(key) {
 					http.Error(w, "Unauthorized: Invalid API key", http.StatusUnauthorized)
-					return
-				}
-
-				if !mockRateLimiter.Allow(key) {
-					http.Error(w, "Too Many Requests: Rate limit exceeded", http.StatusTooManyRequests)
 					return
 				}
 
