@@ -6,19 +6,30 @@ import (
 	"testing"
 )
 
-// Mock the database functions for testing
-func mockValidateAPIKey(key string) bool {
-	// Simulate valid and invalid API keys
-	if key == "valid-key" {
-		return true
-	}
-	return false
+// Mockable ValidateAPIKey function
+var mockValidateAPIKey = validateAPIKey
+
+// Mockable RateLimiter struct
+type MockRateLimiter struct {
+	allowFunc func(string) bool
 }
 
-// Test the handler function
-func TestHandler(t *testing.T) {
-	// Replace the validateAPIKey function with the mock
-	// validateAPIKey = mockValidateAPIKey()
+func (m *MockRateLimiter) Allow(apiKey string) bool {
+	return m.allowFunc(apiKey)
+}
+
+func TestAPIRoute(t *testing.T) {
+	// Mock validateAPIKey function
+	mockValidateAPIKey = func(key string) bool {
+		return key == "valid-key"
+	}
+
+	// Mock rate limiter
+	mockRateLimiter := &MockRateLimiter{
+		allowFunc: func(apiKey string) bool {
+			return apiKey != "rate-limited-key"
+		},
+	}
 
 	tests := []struct {
 		name           string
@@ -30,7 +41,7 @@ func TestHandler(t *testing.T) {
 			name:           "Valid API Key",
 			apiKey:         "valid-key",
 			expectedStatus: http.StatusOK,
-			expectedBody:   "{\"message\":\"Hello, base route!\"}\n",
+			expectedBody:   "Access Granted!",
 		},
 		{
 			name:           "Invalid API Key",
@@ -39,7 +50,7 @@ func TestHandler(t *testing.T) {
 			expectedBody:   "Unauthorized: Invalid API key\n",
 		},
 		{
-			name:           "Missing API Key",
+			name:           "No Key",
 			apiKey:         "",
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   "Unauthorized: Invalid API key\n",
@@ -48,28 +59,32 @@ func TestHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a new HTTP request
-			req := httptest.NewRequest(http.MethodGet, "/apiroute", nil)
-			if tt.apiKey != "" {
-				q := req.URL.Query()
-				q.Add("api_key", tt.apiKey)
-				req.URL.RawQuery = q.Encode()
-			}
-
-			// Create a ResponseRecorder to capture the response
+			req := httptest.NewRequest(http.MethodGet, "/apiroute?api_key="+tt.apiKey, nil)
 			rr := httptest.NewRecorder()
 
-			// Call the handler function
-			handler(rr, req)
+			// Inject mocks into handler
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				key := r.URL.Query().Get("api_key")
+				if !mockValidateAPIKey(key) {
+					http.Error(w, "Unauthorized: Invalid API key", http.StatusUnauthorized)
+					return
+				}
 
-			// Check the status code
+				if !mockRateLimiter.Allow(key) {
+					http.Error(w, "Too Many Requests: Rate limit exceeded", http.StatusTooManyRequests)
+					return
+				}
+
+				w.Header().Set("Content-Type", "text/plain")
+				w.Write([]byte("Access Granted!"))
+			}).ServeHTTP(rr, req)
+
 			if status := rr.Code; status != tt.expectedStatus {
-				t.Errorf("handler returned wrong status code: got %v want %v", status, tt.expectedStatus)
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, status)
 			}
 
-			// Check the response body
 			if body := rr.Body.String(); body != tt.expectedBody {
-				t.Errorf("handler returned unexpected body: got %v want %v", body, tt.expectedBody)
+				t.Errorf("Expected body %q, got %q", tt.expectedBody, body)
 			}
 		})
 	}

@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"encoding/json"
-
 	"github.com/joho/godotenv"
 	_ "modernc.org/sqlite"
 )
@@ -106,17 +104,18 @@ func (rl *RateLimiter) Allow(apiKey string) bool {
 var rateLimiter = NewRateLimiter()
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("request from base route")
+	// fmt.Println("request from base route")
 	// Set the response header to JSON
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 
 	// Create a response struct
-	response := Response{Message: "Hello, base route!"}
+	response := Response{Message: "Hello, world!"}
 
 	// Encode the response to JSON and write it to the response writer
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if _, err := w.Write([]byte(response.Message)); err != nil {
 		http.Error(w, "Unable to encode response", http.StatusInternalServerError)
 	}
+
 }
 
 func apiroute(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +136,7 @@ func apiroute(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 
 	// Write the plain text response directly
-	w.Write([]byte("Hello, world!"))
+	w.Write([]byte("Hello, api world!"))
 }
 
 func name(w http.ResponseWriter, r *http.Request) {
