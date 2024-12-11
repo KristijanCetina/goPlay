@@ -1,4 +1,4 @@
-module kcetina/fib
+module kcetina/apiplay
 
 go 1.23.4
 
